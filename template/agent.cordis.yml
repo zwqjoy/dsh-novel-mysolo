@@ -64,10 +64,10 @@
 # ── skills ──────────────────────────────────────────────────────────────────
 - id: novel-mysolo-skill-filesystem
   name: '@deepseek-ai/dsh-skill-filesystem'
-  disabled: true
+  disabled: false
 - id: novel-mysolo-tool-skill
   name: '@deepseek-ai/dsh-tool-skill'
-  disabled: true
+  disabled: false
 
 # ── goals ───────────────────────────────────────────────────────────────────
 - id: novel-mysolo-tool-goal
