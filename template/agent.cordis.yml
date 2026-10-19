@@ -1,0 +1,125 @@
+# The `novel-mysolo` agent preset (quantization-robust single-author novel studio)
+- id: novel-mysolo-persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    prefix: !!js |-
+      (() => {
+        const fail = 'novel-mysolo 预设装载失败：未读到包内 persona.md。本次没有写作规范与审核流程，请重新安装 dsh-novel-mysolo 插件。'
+        try {
+          const fs = process.getBuiltinModule('node:fs'), path = process.getBuiltinModule('node:path')
+          const url = process.getBuiltinModule('node:url'), mod = process.getBuiltinModule('node:module')
+          // 两个宿主给出的解析基准不同：0.1.6 是本预设所在的部署目录，0.1.7 是
+          // profile 目录（不含包内资源），所以再按包名找到已安装的本包根目录。
+          const roots = []
+          try { roots.push(url.fileURLToPath(ctx.baseUrl)) } catch {}
+          try { roots.push(path.dirname(mod.createRequire(ctx.baseUrl).resolve('dsh-novel-mysolo/package.json'))) } catch {}
+          let text
+          for (const root of roots) {
+            for (const rel of ['persona.md', path.join('template', 'persona.md')]) {
+              try { text = fs.readFileSync(path.join(root, rel), 'utf8') } catch {}
+              if (text) break
+            }
+            if (text) break
+          }
+          if (!text) return fail
+          return text
+        } catch { return fail }
+      })()
+    complete: true
+    includeRuntimeContext: false
+
+# ── preset-scoped toolChoice pin ────────────────────────────────────────────
+- id: novel-mysolo-tool-choice-pin
+  name: './plugins/llm-tool-choice-pin/index.mjs'
+  config:
+    providers: [llama]
+    toolChoice: auto
+
+# ── shell ───────────────────────────────────────────────────────────────────
+- id: novel-mysolo-tool-bash
+  name: '@deepseek-ai/dsh-tool-bash'
+  disabled: true
+- id: novel-mysolo-tool-pwsh
+  name: '@deepseek-ai/dsh-tool-pwsh'
+  disabled: false
+
+# ── filesystem ──────────────────────────────────────────────────────────────
+# str_replace_editor（最高优先）：所有 编辑/创建/替换 首选，read/write/edit 为失效备选；pwsh 仅做文件系统管理（改名/删除），不参与正文编辑。
+- id: novel-mysolo-str-replace-editor
+  name: '@deepseek-ai/dsh-tool-str-replace-editor'
+  config:
+    maxOutputChars: 16000
+- id: novel-mysolo-tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+- id: novel-mysolo-tool-fs-search
+  name: '@deepseek-ai/dsh-tool-fs-search'
+  config:
+    sampleOverCapGlobResults: false
+
+# ── background jobs ────────────────────────────────────────────────────────
+- id: novel-mysolo-tool-jobs
+  name: '@deepseek-ai/dsh-tool-jobs'
+  disabled: true
+
+# ── skills ──────────────────────────────────────────────────────────────────
+- id: novel-mysolo-skill-filesystem
+  name: '@deepseek-ai/dsh-skill-filesystem'
+  disabled: true
+- id: novel-mysolo-tool-skill
+  name: '@deepseek-ai/dsh-tool-skill'
+  disabled: true
+
+# ── goals ───────────────────────────────────────────────────────────────────
+- id: novel-mysolo-tool-goal
+  name: '@deepseek-ai/dsh-tool-goal'
+  disabled: true
+
+# ── plan mode ───────────────────────────────────────────────────────────────
+- id: novel-mysolo-planning
+  name: cordis:group
+  group: true
+  isolate:
+    planMode: true
+  config:
+    - id: novel-mysolo-plan-mode
+      name: '@deepseek-ai/dsh-plan-mode'
+      disabled: true
+      config:
+        section: |
+              You are in plan mode. Stay in plan mode until exit_plan_mode succeeds or the user switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement approves nothing and does not end plan mode. Explore first with non-mutating reads. Do not edit or write files. Prefer existing functions and patterns. Use ask_user_question only for user-owned choices or material ambiguity. Make the plan decision-complete. When ready, call exit_plan_mode with the complete plan markdown, starting with a # title. Make it the only and final tool call in that assistant response. Do not paste the final plan as a plain reply. If review rejects it, incorporate the feedback and present again.
+
+# ── compaction ──────────────────────────────────────────────────────────────
+- id: novel-mysolo-compaction
+  name: cordis:group
+  group: true
+  isolate:
+    compaction: true
+    toolResultPruner: true
+  config:
+    - id: novel-mysolo-compaction-basic
+      name: '@deepseek-ai/dsh-compaction-basic'
+    - id: novel-mysolo-command-compact
+      name: '@deepseek-ai/dsh-command-compact'
+    - id: novel-mysolo-tool-result-pruner
+      name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+      config:
+        thresholdChars: 8192
+        headChars: 4096
+        tailChars: 1024
+
+# ── remaining model-facing rows ─────────────────────────────────────────────
+- id: novel-mysolo-tool-ask-user
+  name: '@deepseek-ai/dsh-tool-ask-user'
+- id: novel-mysolo-tool-todo
+  name: '@deepseek-ai/dsh-tool-todo'
+  disabled: true
+  config:
+    allowParallelInProgress: true
+
+# web tool disabled to slim catalog for quantized models
+- id: novel-mysolo-tool-web
+  name: '@deepseek-ai/dsh-tool-web'
+  disabled: true
+  config:
+    fetch: false
+    searchTimeoutMs: 60000
